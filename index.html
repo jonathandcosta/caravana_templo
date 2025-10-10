@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Caravana ao Templo de Final de Ano</title>
+  <title>Caravana ao Templo</title>
   <!-- Carrega Tailwind CSS para estilização moderna e responsiva -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -444,8 +444,8 @@
     function setupRealtimeListener() {
       if (!db) return;
       const colRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_NAME}`);
-      // Ordena por nome (ascendente)
-      const q = query(colRef, orderBy("name", "asc"), limit(MAX_CAPACITY));
+      // Ordena por data e hora de cadastro (cronológica - ASC)
+      const q = query(colRef, orderBy("timestamp", "asc"), limit(MAX_CAPACITY));
 
       onSnapshot(q, (snapshot) => {
         registrations = [];
@@ -559,7 +559,7 @@
 
     <!-- Cabeçalho Principal e Navegação -->
     <header class="bg-blue-700 text-white p-6 rounded-2xl shadow-xl mb-6">
-      <h1 class="text-3xl font-extrabold text-center">Caravana ao Templo de Final de Ano</h1>
+      <h1 class="text-3xl font-extrabold text-center">Caravana ao Templo Ala Alecrim</h1>
       <p class="text-center text-blue-200 mt-2">Recife - PE | 26 de Dezembro de 2025</p>
       <div class="text-center mt-4 text-xl font-bold p-2 bg-blue-600 rounded-lg">
         Vagas Registradas: <span id="capacityCount">0/50</span>
@@ -570,7 +570,7 @@
         <button id="navToForm" class="bg-blue-500 hover:bg-blue-400 transition p-2 rounded-lg font-semibold text-sm shadow-md w-full sm:w-auto">
           Página 1: Registrar Membro
         </button>
-        <button id="navToList" class="bg-blue-500 hover:bg-blue-400 transition p-2 rounded-lg font-semibold text-sm shadow-md w-full sm:w-auto disabled">
+        <button id="navToList" class="bg-blue-500 hover:bg-blue-400 transition p-2 rounded-lg font-semibold text-sm shadow-md w-full sm:w-auto">
           Página 2: Lista & Status
         </button>
       </nav>
