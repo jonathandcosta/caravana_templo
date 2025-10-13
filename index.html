@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Caravana ao Templo</title>
+  <title>Caravana ao Templo de Final de Ano</title>
   <!-- Carrega Tailwind CSS para estilização moderna e responsiva -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -60,6 +60,72 @@
         opacity: 1;
       }
     }
+
+    /* Estilo para cartões de filtro */
+    .filter-card {
+      transition: all 0.2s ease-in-out;
+      border: 2px solid transparent;
+      /* Garante que a transição de borda seja suave */
+    }
+
+    /* Estilo ativo será adicionado via JS (border-4 border-blue-700 shadow-2xl) */
+
+    /* --- Estilos Otimizados para Impressão --- */
+    @media print {
+      body {
+        background-color: white !important;
+      }
+
+      /* Esconde tudo que não for a lista de visualização */
+      .no-print {
+        display: none !important;
+      }
+
+      /* Mostra apenas o container principal */
+      .print-only {
+        display: block !important;
+      }
+
+      /* Remove margens e padding desnecessários para impressão */
+      .max-w-4xl,
+      .p-4,
+      .md\:p-6,
+      .lg\:p-8 {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      /* Limpa os cards de fundo para economizar tinta */
+      #listView section,
+      #participantsList div {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        /* Adiciona uma borda fina para separação */
+        margin-bottom: 0.5rem !important;
+        border-radius: 0 !important;
+      }
+
+      /* Oculta os toggles e botões de ação para uma lista limpa */
+      .toggle-checkbox,
+      .toggle-label,
+      .flex-wrap,
+      .space-x-2 button {
+        display: none !important;
+      }
+
+      /* Exibe o texto de status em vez dos toggles no card impresso */
+      .print-status-text {
+        display: inline !important;
+      }
+
+      /* Garante que o dashboard de resumo apareça limpo */
+      #listView .grid {
+        border: 1px solid #ccc;
+        margin-bottom: 1rem;
+      }
+    }
   </style>
   <!-- Importações do Firebase -->
   <script type="module">
@@ -85,6 +151,10 @@
     let registrations = [];
     const MAX_CAPACITY = 50;
     const COLLECTION_NAME = 'caravanRegistrations';
+    const PAYMENT_DEADLINE = "10 de Dezembro de 2025"; // Data limite de pagamento
+
+    // Estado do filtro de lista
+    let currentFilter = 'all'; // Pode ser 'all', 'isPaid', 'isRecommended', 'isScheduled'
 
     // Elementos DOM
     const form = document.getElementById('registrationForm');
@@ -99,10 +169,20 @@
     const editForm = document.getElementById('editForm');
     const editCpf = document.getElementById('editCpf');
 
-    // Novos elementos para o Dashboard de Resumo
+    // Elementos Dashboard
     const paidCountDisplay = document.getElementById('paidCount');
     const recommendedCountDisplay = document.getElementById('recommendedCount');
     const scheduledCountDisplay = document.getElementById('scheduledCount');
+
+    // Elementos do Novo Alerta de Pagamento
+    const paymentAlertModal = document.getElementById('paymentAlertModal');
+    const paymentAlertMessage = document.getElementById('paymentAlertMessage');
+    const paidNoRadio = document.getElementById('paidNo');
+
+    // Elementos do Novo Modal de Sucesso
+    const successModal = document.getElementById('successModal');
+    const successMessageContent = document.getElementById('successMessageContent');
+    const successSpotsLeft = document.getElementById('successSpotsLeft');
 
 
     // --- Utilitários ---
@@ -142,7 +222,7 @@
         messageBox.classList.remove('opacity-100');
         messageBox.classList.add('opacity-0');
         setTimeout(() => messageBox.style.display = 'none', 300);
-      }, 8000);
+      }, 5000);
     }
 
     function switchView(viewId) {
@@ -161,30 +241,102 @@
       }
     }
 
+    // --- NOVO: Função de Impressão ---
+    function printList() {
+      window.print();
+    }
+
+    // --- Alerta de Pagamento ---
+    function showPaymentAlert() {
+      paymentAlertMessage.innerHTML = `
+                Lembrete: Você tem até o dia 
+                <span class="font-extrabold text-red-700">${PAYMENT_DEADLINE}</span>
+                para efetuar o pagamento. Procure o <span class="font-bold">secretário da Ala Alecrim</span>.
+            `;
+      paymentAlertModal.classList.remove('hidden');
+      paymentAlertModal.classList.add('flex');
+    }
+
+    function hidePaymentAlert() {
+      paymentAlertModal.classList.add('hidden');
+      paymentAlertModal.classList.remove('flex');
+    }
+
+    // --- Modal de Sucesso ---
+    function showSuccessModal(memberName, spotsLeft) {
+      successMessageContent.innerHTML = `
+                O membro <span class="font-bold text-blue-700">${memberName}</span> foi registrado(a) com sucesso na lista da caravana para 26.12.25.
+            `;
+      successSpotsLeft.textContent = spotsLeft;
+
+      successModal.classList.remove('hidden');
+      successModal.classList.add('flex');
+    }
+
+    function hideSuccessModal() {
+      successModal.classList.add('hidden');
+      successModal.classList.remove('flex');
+    }
+
+    // --- Filtragem e Ativação Visual ---
+    function setFilter(filterType) {
+      // Se clicar no filtro ativo, reseta para 'all'
+      if (currentFilter === filterType) {
+        currentFilter = 'all';
+      } else {
+        currentFilter = filterType;
+      }
+
+      // Atualiza o feedback visual (Adiciona/Remove borda e sombra)
+      document.querySelectorAll('.filter-card').forEach(card => {
+        card.classList.remove('border-4', 'border-blue-700', 'shadow-2xl');
+        if (card.getAttribute('data-filter') === currentFilter) {
+          card.classList.add('border-4', 'border-blue-700', 'shadow-2xl');
+        }
+      });
+
+      renderParticipantsList(); // Re-renderiza a lista com o novo filtro
+    }
+
+
     // --- Inicialização do Firebase e Autenticação (Anônima) ---
     async function initializeFirebase() {
-      // A configuração do Firebase já foi inserida pelo usuário no objeto firebaseConfig.
-
       try {
-        // Inicializa o app UMA única vez.
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-
-        // Autenticação Anônima para que o app funcione sem login/senha
         await signInAnonymously(auth);
 
         userId = auth.currentUser?.uid || crypto.randomUUID();
         console.log("Firebase e Autenticação inicializados. User ID:", userId);
 
-        // Inicia o listener de dados após a autenticação
         setupRealtimeListener();
 
         switchView('form');
 
+        // Listeners para Modals e Filtros
+        if (paidNoRadio) {
+          paidNoRadio.addEventListener('change', (e) => {
+            if (e.target.checked) {
+              showPaymentAlert();
+            }
+          });
+        }
+
+        document.getElementById('closePaymentAlert').addEventListener('click', hidePaymentAlert);
+        document.getElementById('closeSuccessModal').addEventListener('click', hideSuccessModal);
+
+        // Listeners para os cards do dashboard
+        document.getElementById('paidCard')?.addEventListener('click', () => setFilter('isPaid'));
+        document.getElementById('recommendedCard')?.addEventListener('click', () => setFilter('isRecommended'));
+        document.getElementById('scheduledCard')?.addEventListener('click', () => setFilter('isScheduled'));
+
+        // NOVO: Listener para o botão de impressão
+        document.getElementById('printListBtn')?.addEventListener('click', printList);
+
+
       } catch (error) {
         console.error("Erro ao inicializar Firebase ou autenticar:", error);
-        // Sugere verificar a Autenticação Anônima
         if (error.code === 'auth/configuration-not-found') {
           displayMessage("ERRO: O Authentication Anônimo pode não estar habilitado no seu projeto Firebase.", true);
         } else {
@@ -204,12 +356,25 @@
 
       listContainer.innerHTML = ''; // Limpa a lista atual
 
-      if (registeredCount === 0) {
-        listContainer.innerHTML = '<p class="text-gray-500 italic p-4 text-center">Nenhum membro registrado ainda.</p>';
+      // Aplica a filtragem local
+      const filteredRegistrations = registrations.filter(member => {
+        if (currentFilter === 'all') {
+          return true;
+        }
+        // Filtra pelo campo booleano que está ativo (isPaid, isRecommended, isScheduled)
+        return member[currentFilter] === true;
+      });
+
+      if (filteredRegistrations.length === 0) {
+        let message = 'Nenhum membro registrado ainda.';
+        if (currentFilter !== 'all') {
+          message = `Nenhum membro corresponde ao filtro: ${currentFilter === 'isPaid' ? 'Pagos' : currentFilter === 'isRecommended' ? 'Recomendação Ativa' : 'Agendados'}.`;
+        }
+        listContainer.innerHTML = `<p class="text-gray-500 italic p-4 text-center">${message}</p>`;
         return;
       }
 
-      registrations.forEach(member => {
+      filteredRegistrations.forEach(member => {
         // Configuração visual para status
         const paidColor = member.isPaid ? 'bg-green-500' : 'bg-yellow-500';
         const scheduledColor = member.isScheduled ? 'bg-blue-500' : 'bg-red-500';
@@ -225,45 +390,45 @@
                     </div>
 
                     <!-- Linha 2: Status Toggles (Responsivo) -->
-                    <div class="hidden">
+                    <div class="flex flex-wrap gap-x-4 gap-y-2 items-center w-full border-y border-gray-100 py-3">
                         
-                        <!-- Pagamento Toggle -->
+                        <!-- Pagamento Toggle e Texto de Status para Impressão -->
                         <div class="flex items-center space-x-2">
                             <span class="text-sm font-medium text-gray-700 min-w-[50px]">Pagto:</span>
-                            <label class="flex items-center cursor-pointer">
+                            <label class="flex items-center cursor-pointer no-print">
                                 <div class="relative">
                                     <input type="checkbox" data-id="${member.id}" data-field="isPaid" class="hidden toggle-checkbox" ${member.isPaid ? 'checked' : ''}>
                                     <div class="toggle-label block ${paidColor} w-10 h-5 rounded-full shadow-inner transition duration-200"></div>
                                     <div class="toggle-circle absolute left-1 top-0.5 bg-white w-4 h-4 rounded-full shadow transition transform duration-200"></div>
                                 </div>
                             </label>
-                            <span class="text-xs ${member.isPaid ? 'text-green-600' : 'text-yellow-600'} hidden sm:inline">${member.isPaid ? 'Pago' : 'Pend.'}</span>
+                            <span class="print-status-text text-sm font-semibold ${member.isPaid ? 'text-green-600' : 'text-yellow-600'}">${member.isPaid ? 'Pago' : 'Pendente'}</span>
                         </div>
 
-                        <!-- Ordenança Toggle -->
+                        <!-- Ordenança Toggle e Texto de Status para Impressão -->
                         <div class="flex items-center space-x-2">
                             <span class="text-sm font-medium text-gray-700 min-w-[50px]">Ord.:</span>
-                            <label class="flex items-center cursor-pointer">
+                            <label class="flex items-center cursor-pointer no-print">
                                 <div class="relative">
                                     <input type="checkbox" data-id="${member.id}" data-field="isScheduled" class="hidden toggle-checkbox" ${member.isScheduled ? 'checked' : ''}>
                                     <div class="toggle-label block ${scheduledColor} w-10 h-5 rounded-full shadow-inner transition duration-200"></div>
                                     <div class="toggle-circle absolute left-1 top-0.5 bg-white w-4 h-4 rounded-full shadow transition transform duration-200"></div>
                                 </div>
                             </label>
-                            <span class="text-xs ${member.isScheduled ? 'text-blue-600' : 'text-red-600'} hidden sm:inline">${member.isScheduled ? 'Agend.' : 'Não Ag.'}</span>
+                            <span class="print-status-text text-sm font-semibold ${member.isScheduled ? 'text-blue-600' : 'text-red-600'}">${member.isScheduled ? 'Agendado' : 'Não Agendado'}</span>
                         </div>
 
-                        <!-- Recomendação Toggle -->
+                        <!-- Recomendação Toggle e Texto de Status para Impressão -->
                         <div class="flex items-center space-x-2">
                             <span class="text-sm font-medium text-gray-700 min-w-[50px]">Recom.:</span>
-                            <label class="flex items-center cursor-pointer">
+                            <label class="flex items-center cursor-pointer no-print">
                                 <div class="relative">
                                     <input type="checkbox" data-id="${member.id}" data-field="isRecommended" class="hidden toggle-checkbox" ${member.isRecommended ? 'checked' : ''}>
                                     <div class="toggle-label block ${recommendedColor} w-10 h-5 rounded-full shadow-inner transition duration-200"></div>
                                     <div class="toggle-circle absolute left-1 top-0.5 bg-white w-4 h-4 rounded-full shadow transition transform duration-200"></div>
                                 </div>
                             </label>
-                            <span class="text-xs ${member.isRecommended ? 'text-purple-600' : 'text-red-600'} hidden sm:inline">${member.isRecommended ? 'Ativa' : 'Inativa'}</span>
+                            <span class="print-status-text text-sm font-semibold ${member.isRecommended ? 'text-purple-600' : 'text-red-600'}">${member.isRecommended ? 'Ativa' : 'Inativa'}</span>
                         </div>
                     </div>
 
@@ -272,7 +437,7 @@
                         <p class="text-xs text-gray-500">
                             <span class="font-semibold text-gray-600">Registro:</span> ${formatTimestamp(member.timestamp)}
                         </p>
-                        <div class="hidden">
+                        <div class="flex space-x-2 no-print">
                             <button data-id="${member.id}" data-member='${JSON.stringify(member)}' class="edit-btn text-blue-500 hover:text-blue-700 text-sm font-medium p-1 rounded-lg flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -500,10 +665,14 @@
       const cpfRaw = formData.get('cpf').trim().replace(/\D/g, '');
       const formattedName = toTitleCase(name);
 
+      // Validação de campos obrigatórios
       if (name === '' || cpfRaw.length !== 11) {
         displayMessage("Por favor, preencha o Nome e o CPF corretamente (11 dígitos).", true);
         return;
       }
+
+      const isPaidStatus = formData.get('isPaid') === 'true';
+
       if (!db) {
         displayMessage("Sistema de banco de dados não inicializado. Verifique a configuração.", true);
         return;
@@ -515,7 +684,7 @@
       const newMemberData = {
         name: formattedName,
         cpf: cpfRaw,
-        isPaid: formData.get('isPaid') === 'true',
+        isPaid: isPaidStatus, // Usa o status já verificado
         isScheduled: formData.get('isScheduled') === 'true',
         isRecommended: formData.get('isRecommended') === 'true',
         timestamp: new Date().toISOString(),
@@ -524,9 +693,12 @@
       try {
         // Adiciona o documento na coleção pública da aplicação
         await addDoc(collection(db, `/artifacts/${appId}/public/data/${COLLECTION_NAME}`), newMemberData);
+        // Calcula as vagas restantes usando o tamanho atual da lista (será atualizado pelo listener)
         const spotsLeft = MAX_CAPACITY - (registrations.length + 1);
-        const successMsg = `🎉 Sucesso! ${formattedName} foi registrado(a) na lista da caravana para 26.12.25. Ainda restam ${spotsLeft} vagas disponíveis no ônibus.`;
-        displayMessage(successMsg, false);
+
+        // Exibe o modal de sucesso
+        showSuccessModal(formattedName, spotsLeft);
+
         form.reset();
       } catch (error) {
         console.error("Erro ao adicionar membro:", error);
@@ -558,7 +730,7 @@
   <div class="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
 
     <!-- Cabeçalho Principal e Navegação -->
-    <header class="bg-blue-700 text-white p-6 rounded-2xl shadow-xl mb-6">
+    <header class="bg-blue-700 text-white p-6 rounded-2xl shadow-xl mb-6 no-print">
       <h1 class="text-3xl font-extrabold text-center">Caravana ao Templo Ala Alecrim</h1>
       <p class="text-center text-blue-200 mt-2">Recife - PE | 26 de Dezembro de 2025</p>
       <div class="text-center mt-4 text-xl font-bold p-2 bg-blue-600 rounded-lg">
@@ -576,7 +748,14 @@
       </nav>
     </header>
 
-    <!-- Container de Mensagens -->
+    <!-- CABEÇALHO PARA IMPRESSÃO (Mostrado apenas ao imprimir) -->
+    <div class="print-only" style="display: none; text-align: center; margin-bottom: 20px;">
+      <h1 style="font-size: 24px; font-weight: bold;">Lista de Inscrição - Caravana ao Templo (26.12.25)</h1>
+      <p>Total de Vagas: 50 | Registrados: <span id="capacityCountPrint"></span></p>
+    </div>
+
+
+    <!-- Container de Mensagens (Apenas para Erros/Atualizações de Status) -->
     <div id="messageBox" class="opacity-0 hidden" role="alert"></div>
 
     <!-- VIEW 1: Formulário de Registro (Página 1) -->
@@ -604,11 +783,11 @@
             <p class="text-sm font-medium text-gray-700 mb-2">Pagou a caravana?</p>
             <div class="flex space-x-4">
               <label class="inline-flex items-center cursor-pointer">
-                <input type="radio" name="isPaid" value="true" class="form-radio h-4 w-4 text-green-600 border-gray-300">
+                <input type="radio" name="isPaid" value="true" required class="form-radio h-4 w-4 text-green-600 border-gray-300">
                 <span class="ml-2 text-sm text-gray-700 font-medium">Sim, Paguei</span>
               </label>
               <label class="inline-flex items-center cursor-pointer">
-                <input type="radio" name="isPaid" value="false" class="form-radio h-4 w-4 text-yellow-600 border-gray-300" checked>
+                <input type="radio" name="isPaid" value="false" id="paidNo" class="form-radio h-4 w-4 text-yellow-600 border-gray-300">
                 <span class="ml-2 text-sm text-gray-700 font-medium">Não Paguei</span>
               </label>
             </div>
@@ -619,11 +798,11 @@
             <p class="text-sm font-medium text-gray-700 mb-2">Agendou a ordenança no templo?</p>
             <div class="flex space-x-4">
               <label class="inline-flex items-center cursor-pointer">
-                <input type="radio" name="isScheduled" value="true" class="form-radio h-4 w-4 text-blue-600 border-gray-300">
+                <input type="radio" name="isScheduled" value="true" required class="form-radio h-4 w-4 text-blue-600 border-gray-300">
                 <span class="ml-2 text-sm text-gray-700 font-medium">Sim, Agendei</span>
               </label>
               <label class="inline-flex items-center cursor-pointer">
-                <input type="radio" name="isScheduled" value="false" class="form-radio h-4 w-4 text-red-600 border-gray-300" checked>
+                <input type="radio" name="isScheduled" value="false" class="form-radio h-4 w-4 text-red-600 border-gray-300">
                 <span class="ml-2 text-sm text-gray-700 font-medium">Não Agendei</span>
               </label>
             </div>
@@ -634,7 +813,7 @@
             <p class="text-sm font-medium text-gray-700 mb-2">Recomendação do Templo Ativa?</p>
             <div class="flex space-x-4">
               <label class="inline-flex items-center cursor-pointer">
-                <input type="radio" name="isRecommended" value="true" class="form-radio h-4 w-4 text-purple-600 border-gray-300" checked>
+                <input type="radio" name="isRecommended" value="true" required class="form-radio h-4 w-4 text-purple-600 border-gray-300">
                 <span class="ml-2 text-sm text-gray-700 font-medium">Sim, Ativa</span>
               </label>
               <label class="inline-flex items-center cursor-pointer">
@@ -655,24 +834,34 @@
     <!-- VIEW 2: Lista de Participantes (Página 2) -->
     <div id="listView" class="fade-in" style="display: none;">
       <section class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-semibold mb-5 text-gray-800 border-b pb-2">Lista de Participantes e Status</h2>
+        <h2 class="text-2xl font-semibold mb-5 text-gray-800 border-b pb-2 no-print">Lista de Participantes e Status</h2>
 
-        <!-- NOVO: DASHBOARD DE RESUMO DE GESTÃO -->
-        <div class="hidden">
-          <div class=" bg-green-100 p-3 rounded-xl text-center shadow-inner">
-            <p class="text-sm font-semibold text-green-800">Pagos</p>
+        <!-- Botão de Impressão -->
+        <div class="flex justify-end mb-4 no-print">
+          <button id="printListBtn" class="bg-gray-700 text-white font-semibold p-2 px-4 rounded-lg hover:bg-gray-800 transition flex items-center shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm2-4h2V9m-2 0h2" />
+            </svg>
+            Imprimir / Salvar PDF
+          </button>
+        </div>
+
+        <!-- DASHBOARD DE RESUMO DE GESTÃO E FILTROS -->
+        <div class="grid grid-cols-3 gap-3 mb-6 no-print">
+          <div id="paidCard" data-filter="isPaid" class="filter-card bg-green-100 p-3 rounded-xl text-center shadow-inner cursor-pointer transition duration-150 hover:bg-green-200">
+            <p class="text-sm font-semibold text-green-800 truncate">Pago</p>
             <p id="paidCount" class="text-xl font-bold text-green-600">0</p>
           </div>
-          <div class="bg-purple-100 p-3 rounded-xl text-center shadow-inner">
-            <p class="text-sm font-semibold text-purple-800">Recomendação</p>
+          <div id="recommendedCard" data-filter="isRecommended" class="filter-card bg-purple-100 p-3 rounded-xl text-center shadow-inner cursor-pointer transition duration-150 hover:bg-purple-200">
+            <p class="text-sm font-semibold text-purple-800 truncate">Recomendação</p>
             <p id="recommendedCount" class="text-xl font-bold text-purple-600">0</p>
           </div>
-          <div class="bg-blue-100 p-3 rounded-xl text-center shadow-inner">
-            <p class="text-sm font-semibold text-blue-800">Agendados</p>
+          <div id="scheduledCard" data-filter="isScheduled" class="filter-card bg-blue-100 p-3 rounded-xl text-center shadow-inner cursor-pointer transition duration-150 hover:bg-blue-200">
+            <p class="text-sm font-semibold text-blue-800 truncate">Agendados</p>
             <p id="scheduledCount" class="text-xl font-bold text-blue-600">0</p>
           </div>
         </div>
-        <!-- FIM DASHBOARD -->
+        <!-- FIM DASHBOARD E FILTROS -->
 
         <div id="participantsList" class="space-y-4">
           <!-- Itens serão renderizados aqui via JavaScript -->
@@ -683,8 +872,54 @@
 
   </div>
 
+  <!-- MODAL DE ALERTA DE PAGAMENTO -->
+  <div id="paymentAlertModal" class="modal fixed inset-0 hidden items-center justify-center p-4 no-print">
+    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg text-center border-t-8 border-red-500">
+      <h3 class="text-2xl font-bold text-red-600 mb-4 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.457-1.785 1.689-3.155L13.689 3.4c-.768-1.37-2.612-1.37-3.38 0L3.373 17.845c-.768 1.37.149 3.155 1.69 3.155z" />
+        </svg>
+        Lembrete de Pagamento!
+      </h3>
+
+      <p id="paymentAlertMessage" class="mb-6 text-lg text-gray-700 leading-relaxed font-medium">
+        <!-- Mensagem inserida via JS -->
+      </p>
+
+      <button id="closePaymentAlert" type="button" class="w-full bg-red-500 text-white font-bold p-3 rounded-lg hover:bg-red-600 transition duration-150 shadow-md">
+        Entendi
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE SUCESSO DE REGISTRO -->
+  <div id="successModal" class="modal fixed inset-0 hidden items-center justify-center p-4 no-print">
+    <div class="modal-content bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg text-center border-t-8 border-green-500">
+      <h3 class="text-2xl font-bold text-green-600 mb-4 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Registro Confirmado!
+      </h3>
+
+      <p id="successMessageContent" class="mb-4 text-lg text-gray-700 leading-relaxed font-medium">
+        <!-- Nome inserido via JS -->
+      </p>
+
+      <p class="mb-6 text-md text-gray-600">
+        Vagas disponíveis restantes:
+        <span id="successSpotsLeft" class="font-extrabold text-blue-600 text-xl"></span>
+      </p>
+
+      <button id="closeSuccessModal" type="button" class="w-full bg-blue-500 text-white font-bold p-3 rounded-lg hover:bg-blue-600 transition duration-150 shadow-md">
+        Fechar
+      </button>
+    </div>
+  </div>
+
+
   <!-- MODAL DE EDIÇÃO (Pop-up) -->
-  <div id="editModal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+  <div id="editModal" class="modal fixed inset-0 hidden items-center justify-center p-4 no-print">
     <div class="modal-content bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
       <div class="flex justify-between items-center border-b pb-3 mb-4">
         <h3 class="text-xl font-bold text-gray-800">Editar Registro</h3>
@@ -760,7 +995,7 @@
   </div>
 
   <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (Pop-up) -->
-  <div id="confirmationModal" class="modal fixed inset-0 hidden items-center justify-center p-4">
+  <div id="confirmationModal" class="modal fixed inset-0 hidden items-center justify-center p-4 no-print">
     <div class="modal-content bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
       <h3 class="text-xl font-bold text-red-600 mb-4">Atenção!</h3>
       <p id="confirmationText" class="mb-6 text-gray-700">Tem certeza que deseja apagar o registro?</p>
