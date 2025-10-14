@@ -840,7 +840,7 @@
         <h2 class="text-2xl font-semibold mb-5 text-gray-800 border-b pb-2 no-print">Lista de Participantes e Status</h2>
 
         <!-- Botão de Impressão -->
-        <div class="flex justify-end mb-4 no-print">
+        <div class="hidden">
           <button id="printListBtn" class="bg-gray-700 text-white font-semibold p-2 px-4 rounded-lg hover:bg-gray-800 transition flex items-center shadow-md">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm2-4h2V9m-2 0h2" />
@@ -850,7 +850,7 @@
         </div>
 
         <!-- DASHBOARD DE RESUMO DE GESTÃO E FILTROS -->
-        <div class="grid grid-cols-3 gap-3 mb-6 no-print">
+        <div class="hidden">
           <div id="paidCard" data-filter="isPaid" class="filter-card bg-green-100 p-3 rounded-xl text-center shadow-inner cursor-pointer transition duration-150 hover:bg-green-200">
             <p class="text-sm font-semibold text-green-800 truncate">Pago</p>
             <p id="paidCount" class="text-xl font-bold text-green-600">0</p>
@@ -1014,5 +1014,6 @@
     </div>
   </div>
 </body>
+
 
 </html>
