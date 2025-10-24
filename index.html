@@ -884,7 +884,7 @@
         <h2 class="text-2xl font-semibold mb-5 text-gray-800 border-b pb-2 no-print">Lista de Participantes e Status</h2>
 
         <!-- Botão de Impressão -->
-        <div class="flex justify-end mb-4 no-print">
+        <div class="hidden">
           <button id="printListBtn" class="bg-gray-700 text-white font-semibold p-2 px-4 rounded-lg hover:bg-gray-800 transition flex items-center shadow-md">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm2-4h2V9m-2 0h2" />
@@ -953,10 +953,17 @@
         <!-- Nome inserido via JS -->
       </p>
 
-      <p class="mb-6 text-md text-gray-600">
-        Vagas disponíveis restantes:
-        <span id="successSpotsLeft" class="font-extrabold text-blue-600 text-xl"></span>
-      </p>
+         <p class="mb-6 text-md text-gray-600">
+          Vagas disponíveis restantes:
+          <span id="successSpotsLeft" class="font-extrabold text-blue-600 text-xl"></span>
+          <br />
+          <br />
+          <span class="font-extrabold text-blue-600 text-xl">Seja pontual no dia da viagem!</span>
+          <p class="mb-4 text-lg text-gray-700 leading-relaxed font-medium">
+            Esse<span class="font-semibold text-blue-300 text-xl"> Registro</span> + <span class="font-semibold text-blue-300 text-xl">Pagamento </span>
+            te dá prioridade de escolha no ônibus.
+          </p>
+         </p>
 
       <button id="closeSuccessModal" type="button" class="w-full bg-blue-500 text-white font-bold p-3 rounded-lg hover:bg-blue-600 transition duration-150 shadow-md">
         Fechar
@@ -1065,4 +1072,8 @@
   </footer>
 </body>
 
+
 </html>
+
+
+
